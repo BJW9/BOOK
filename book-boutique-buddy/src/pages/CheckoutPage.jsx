@@ -15,7 +15,7 @@ import { formatPrice } from '../utils/formatters'
 const CheckoutPage = () => {
   const { items, getTotalPrice, clearCart } = useCart()
   const { user } = useAuth()
-  const { addresses, fetchAddresses } = useAddresses()
+  const { addresses, fetchAddresses, loading: addressesLoading } = useAddresses()
   const { createOrder } = useOrders()
   const navigate = useNavigate()
 
@@ -37,7 +37,7 @@ const CheckoutPage = () => {
   }, [user])
 
   useEffect(() => {
-    if (addresses.length > 0) {
+    if (addresses && addresses.length > 0) {
       const defaultAddress = addresses.find(addr => addr.is_default)
       if (defaultAddress) {
         setSelectedAddress(defaultAddress.id)
@@ -86,13 +86,23 @@ const CheckoutPage = () => {
     setLoading(true)
 
     try {
+      let finalShippingAddress = null;
+      if (selectedAddress) {
+        finalShippingAddress = addresses.find(addr => addr.id === selectedAddress);
+      } else if (newAddress.street && newAddress.city && newAddress.postal_code) {
+        // If no existing address is selected, and new address fields are filled, use new address
+        finalShippingAddress = newAddress;
+      } else {
+        alert('Veuillez sélectionner une adresse de livraison ou en saisir une nouvelle.');
+        setLoading(false);
+        return;
+      }
+
       // Préparer les données de commande
       const orderData = {
         total_amount: total,
         status: 'pending',
-        shipping_address: selectedAddress ? 
-          addresses.find(addr => addr.id === selectedAddress) : 
-          newAddress,
+        shipping_address: finalShippingAddress,
         delivery_method: deliveryMethod,
         delivery_price: deliveryPrice,
         payment_method: paymentMethod
@@ -157,6 +167,18 @@ const CheckoutPage = () => {
     )
   }
 
+  if (addressesLoading) {
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-center">Chargement des adresses...</p>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Finaliser la commande</h1>
@@ -170,7 +192,7 @@ const CheckoutPage = () => {
               <CardTitle>Adresse de livraison</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {addresses.length > 0 ? (
+              {addresses && addresses.length > 0 ? (
                 <RadioGroup value={selectedAddress} onValueChange={setSelectedAddress}>
                   {addresses.map((address) => (
                     <div key={address.id} className="flex items-center space-x-2">
