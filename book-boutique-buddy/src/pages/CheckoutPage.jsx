@@ -15,9 +15,13 @@ import { formatPrice } from '../utils/formatters'
 const CheckoutPage = () => {
   const { items, getTotalPrice, clearCart } = useCart()
   const { user } = useAuth()
-  const { addresses, fetchAddresses, loading: addressesLoading } = useAddresses()
+  const { addresses, fetchAddresses, loading: addressesLoading, error: addressesError } = useAddresses()
   const { createOrder } = useOrders()
   const navigate = useNavigate()
+
+  // ✅ valeurs sûres
+  const safeItems = Array.isArray(items) ? items : []
+  const safeAddresses = Array.isArray(addresses) ? addresses : []
 
   const [selectedAddress, setSelectedAddress] = useState('')
   const [deliveryMethod, setDeliveryMethod] = useState('domicile')
@@ -30,75 +34,53 @@ const CheckoutPage = () => {
     country: 'France'
   })
 
+  // Chargement des adresses
   useEffect(() => {
-    if (user) {
-      fetchAddresses()
-    }
-  }, [user])
+    if (user) fetchAddresses()
+  }, [user, fetchAddresses])
 
+  // Pré-sélectionner une adresse
   useEffect(() => {
-    if (addresses && addresses.length > 0) {
-      const defaultAddress = addresses.find(addr => addr.is_default)
-      if (defaultAddress) {
-        setSelectedAddress(defaultAddress.id)
-      } else {
-        setSelectedAddress(addresses[0].id)
-      }
+    if (safeAddresses.length > 0) {
+      const def = safeAddresses.find(a => a.is_default)
+      setSelectedAddress((def ?? safeAddresses[0]).id)
+    } else {
+      setSelectedAddress('')
     }
-  }, [addresses])
+  }, [safeAddresses])
 
   const deliveryOptions = [
-    {
-      id: 'domicile',
-      name: 'Livraison à domicile',
-      description: 'Livraison standard à votre domicile',
-      price: 4.99,
-      delay: '2-3 jours ouvrés'
-    },
-    {
-      id: 'point_relais',
-      name: 'Point Relais Mondial Relay',
-      description: 'Retrait dans un point relais près de chez vous',
-      price: 3.99,
-      delay: '2-3 jours ouvrés'
-    },
-    {
-      id: 'express',
-      name: 'Livraison Express',
-      description: 'Livraison rapide en 24h',
-      price: 9.99,
-      delay: '24h'
-    }
+    { id: 'domicile', name: 'Livraison à domicile', description: 'Livraison standard à votre domicile', price: 4.99, delay: '2-3 jours ouvrés' },
+    { id: 'point_relais', name: 'Point Relais Mondial Relay', description: 'Retrait dans un point relais près de chez vous', price: 3.99, delay: '2-3 jours ouvrés' },
+    { id: 'express', name: 'Livraison Express', description: 'Livraison rapide en 24h', price: 9.99, delay: '24h' },
   ]
 
-  const selectedDeliveryOption = deliveryOptions.find(option => option.id === deliveryMethod)
-  const subtotal = getTotalPrice()
+  const selectedDeliveryOption = deliveryOptions.find(o => o.id === deliveryMethod)
+  const subtotal = Number(typeof getTotalPrice === 'function' ? getTotalPrice() : 0)
   const deliveryPrice = selectedDeliveryOption?.price || 0
   const total = subtotal + deliveryPrice
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!user) {
-      navigate('/login')
-      return
-    }
+    if (!user) { navigate('/login'); return }
 
     setLoading(true)
-
     try {
-      let finalShippingAddress = null;
+      let finalShippingAddress = null
       if (selectedAddress) {
-        finalShippingAddress = addresses.find(addr => addr.id === selectedAddress);
-      } else if (newAddress.street && newAddress.city && newAddress.postal_code) {
-        // If no existing address is selected, and new address fields are filled, use new address
-        finalShippingAddress = newAddress;
-      } else {
-        alert('Veuillez sélectionner une adresse de livraison ou en saisir une nouvelle.');
-        setLoading(false);
-        return;
+        finalShippingAddress = safeAddresses.find(a => a.id === selectedAddress) ?? null
+      } 
+      if (!finalShippingAddress) {
+        const { street, city, postal_code } = newAddress
+        if (street && city && postal_code) {
+          finalShippingAddress = newAddress
+        } else {
+          alert('Veuillez sélectionner une adresse de livraison ou en saisir une nouvelle.')
+          setLoading(false)
+          return
+        }
       }
 
-      // Préparer les données de commande
       const orderData = {
         total_amount: total,
         status: 'pending',
@@ -108,106 +90,93 @@ const CheckoutPage = () => {
         payment_method: paymentMethod
       }
 
-      // Créer la commande
       const { data: order, error } = await createOrder(orderData)
-      
-      if (error) {
-        throw error
-      }
+      if (error) throw error
 
-      // Simuler le traitement du paiement
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Simuler un paiement
+      await new Promise(r => setTimeout(r, 1000))
 
-      // Vider le panier
       clearCart()
-
-      // Rediriger vers la page de confirmation
       navigate(`/order-confirmation/${order.id}`)
-    } catch (error) {
-      console.error('Erreur lors de la commande:', error)
+    } catch (err) {
+      console.error('Erreur lors de la commande:', err)
       alert('Une erreur est survenue lors de la commande. Veuillez réessayer.')
     } finally {
       setLoading(false)
     }
   }
 
+  // ======= GUARDS d’affichage =======
+
+  // 1) Pas connecté
   if (!user) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Card>
           <CardContent className="pt-6">
             <p className="text-center">Veuillez vous connecter pour passer commande.</p>
-            <Button 
-              onClick={() => navigate('/login')} 
-              className="w-full mt-4"
-            >
-              Se connecter
-            </Button>
+            <Button onClick={() => navigate('/login')} className="w-full mt-4">Se connecter</Button>
           </CardContent>
         </Card>
       </div>
     )
   }
 
-  if (items.length === 0) {
+  // 2) Cart non encore disponible (évite lecture prématurée)
+  const cartReady = Array.isArray(items)
+
+  // 3) Panier vide
+  if (safeItems.length === 0) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
         <Card>
           <CardContent className="pt-6">
             <p className="text-center">Votre panier est vide.</p>
-            <Button 
-              onClick={() => navigate('/')} 
-              className="w-full mt-4"
-            >
-              Continuer les achats
-            </Button>
+            <Button onClick={() => navigate('/')} className="w-full mt-4">Continuer les achats</Button>
           </CardContent>
         </Card>
       </div>
     )
   }
 
+  // 4) Chargement des adresses
   if (addressesLoading) {
     return (
       <div className="max-w-2xl mx-auto px-4 py-8">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-center">Chargement des adresses...</p>
-          </CardContent>
-        </Card>
+        <Card><CardContent className="pt-6"><p className="text-center">Chargement des adresses…</p></CardContent></Card>
       </div>
     )
   }
 
+  // 5) Erreur d’adresses (mais on laisse commander avec nouvelle adresse)
+  if (addressesError) {
+    console.warn('Addresses error:', addressesError)
+  }
+
+  // ======= UI =======
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-8">Finaliser la commande</h1>
 
       <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        {/* Colonne gauche - Informations de livraison */}
+        {/* Colonne gauche */}
         <div className="space-y-6">
           {/* Adresse de livraison */}
           <Card>
-            <CardHeader>
-              <CardTitle>Adresse de livraison</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Adresse de livraison</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {addresses && addresses.length > 0 ? (
+              {safeAddresses.length > 0 ? (
                 <RadioGroup value={selectedAddress} onValueChange={setSelectedAddress}>
-                  {addresses.map((address) => (
+                  {safeAddresses.map((address) => (
                     <div key={address.id} className="flex items-center space-x-2">
                       <RadioGroupItem value={address.id} id={address.id} />
                       <Label htmlFor={address.id} className="flex-1 cursor-pointer">
                         <div className="p-3 border rounded-lg">
                           <p className="font-medium">{address.street}</p>
-                          <p className="text-sm text-gray-600">
-                            {address.city}, {address.postal_code}
-                          </p>
+                          <p className="text-sm text-gray-600">{address.city}, {address.postal_code}</p>
                           <p className="text-sm text-gray-600">{address.country}</p>
                           {address.is_default && (
-                            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">
-                              Par défaut
-                            </span>
+                            <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">Par défaut</span>
                           )}
                         </div>
                       </Label>
@@ -220,40 +189,19 @@ const CheckoutPage = () => {
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <Label htmlFor="street">Adresse</Label>
-                      <Input
-                        id="street"
-                        value={newAddress.street}
-                        onChange={(e) => setNewAddress(prev => ({
-                          ...prev,
-                          street: e.target.value
-                        }))}
-                        required
-                      />
+                      <Input id="street" value={newAddress.street}
+                        onChange={(e) => setNewAddress(p => ({ ...p, street: e.target.value }))} required />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label htmlFor="city">Ville</Label>
-                        <Input
-                          id="city"
-                          value={newAddress.city}
-                          onChange={(e) => setNewAddress(prev => ({
-                            ...prev,
-                            city: e.target.value
-                          }))}
-                          required
-                        />
+                        <Input id="city" value={newAddress.city}
+                          onChange={(e) => setNewAddress(p => ({ ...p, city: e.target.value }))} required />
                       </div>
                       <div>
                         <Label htmlFor="postal_code">Code postal</Label>
-                        <Input
-                          id="postal_code"
-                          value={newAddress.postal_code}
-                          onChange={(e) => setNewAddress(prev => ({
-                            ...prev,
-                            postal_code: e.target.value
-                          }))}
-                          required
-                        />
+                        <Input id="postal_code" value={newAddress.postal_code}
+                          onChange={(e) => setNewAddress(p => ({ ...p, postal_code: e.target.value }))} required />
                       </div>
                     </div>
                   </div>
@@ -264,9 +212,7 @@ const CheckoutPage = () => {
 
           {/* Mode de livraison */}
           <Card>
-            <CardHeader>
-              <CardTitle>Mode de livraison</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Mode de livraison</CardTitle></CardHeader>
             <CardContent>
               <RadioGroup value={deliveryMethod} onValueChange={setDeliveryMethod}>
                 {deliveryOptions.map((option) => (
@@ -292,30 +238,22 @@ const CheckoutPage = () => {
 
           {/* Paiement */}
           <Card>
-            <CardHeader>
-              <CardTitle>Paiement</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Paiement</CardTitle></CardHeader>
             <CardContent>
               <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="card" id="card" />
-                  <Label htmlFor="card" className="cursor-pointer">
-                    Carte bancaire (Simulé)
-                  </Label>
+                  <Label htmlFor="card" className="cursor-pointer">Carte bancaire (Simulé)</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="paypal" id="paypal" />
-                  <Label htmlFor="paypal" className="cursor-pointer">
-                    PayPal (Simulé)
-                  </Label>
+                  <Label htmlFor="paypal" className="cursor-pointer">PayPal (Simulé)</Label>
                 </div>
               </RadioGroup>
-              
+
               {paymentMethod === 'card' && (
                 <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <p className="text-sm text-gray-600">
-                    💳 Paiement simulé - Aucune carte réelle ne sera débitée
-                  </p>
+                  <p className="text-sm text-gray-600">💳 Paiement simulé - Aucune carte réelle ne sera débitée</p>
                 </div>
               )}
             </CardContent>
@@ -325,28 +263,22 @@ const CheckoutPage = () => {
         {/* Colonne droite - Récapitulatif */}
         <div>
           <Card className="sticky top-4">
-            <CardHeader>
-              <CardTitle>Récapitulatif de commande</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle>Récapitulatif de commande</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              {/* Articles */}
               <div className="space-y-3">
-                {items.map((item) => (
+                {safeItems.map((item) => (
                   <div key={item.id} className="flex justify-between">
                     <div>
                       <p className="font-medium">{item.name}</p>
                       <p className="text-sm text-gray-600">Quantité : {item.quantity}</p>
                     </div>
-                    <p className="font-medium">
-                      {formatPrice(item.price * item.quantity)}
-                    </p>
+                    <p className="font-medium">{formatPrice((item.price ?? 0) * (item.quantity ?? 0))}</p>
                   </div>
                 ))}
               </div>
 
               <Separator />
 
-              {/* Totaux */}
               <div className="space-y-2">
                 <div className="flex justify-between">
                   <span>Sous-total</span>
@@ -363,12 +295,7 @@ const CheckoutPage = () => {
                 </div>
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full" 
-                disabled={loading}
-                size="lg"
-              >
+              <Button type="submit" className="w-full" disabled={loading} size="lg">
                 {loading ? 'Traitement en cours...' : `Payer ${formatPrice(total)}`}
               </Button>
 
@@ -384,4 +311,3 @@ const CheckoutPage = () => {
 }
 
 export default CheckoutPage
-
