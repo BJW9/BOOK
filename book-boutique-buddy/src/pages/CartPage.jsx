@@ -2,10 +2,12 @@ import { Link } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { ShoppingBag, ArrowLeft, Minus, Plus, Trash2 } from 'lucide-react'
 import { useCart } from '../context/CartContext'
+import { useAuth } from '../context/AuthContext'
 import BookCover from '../components/BookCover'
 
 const CartPage = () => {
   const { cartItems, updateQuantity, removeFromCart, getTotalPrice } = useCart()
+  const { user } = useAuth()
 
   if (cartItems.length === 0) {
     return (
@@ -112,13 +114,13 @@ const CartPage = () => {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-gray-600">Livraison</span>
-                <span className="font-medium text-green-600">Gratuite</span>
+                <span className="font-medium text-green-600">À partir de 3,99 €</span>
               </div>
               <div className="border-t pt-3">
                 <div className="flex justify-between">
-                  <span className="text-base font-semibold text-gray-900">Total</span>
+                  <span className="text-base font-semibold text-gray-900">Total estimé</span>
                   <span className="text-lg font-bold text-gray-900">
-                    {getTotalPrice().toFixed(2)} €
+                    À partir de {(getTotalPrice() + 3.99).toFixed(2)} €
                   </span>
                 </div>
                 <p className="text-xs text-gray-500 mt-1">TTC, livraison incluse</p>
@@ -126,17 +128,37 @@ const CartPage = () => {
             </div>
 
             <div className="space-y-3">
-              <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white" size="lg">
-                Procéder au paiement
-              </Button>
+              {user ? (
+                <Link to="/checkout" className="block">
+                  <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white" size="lg">
+                    Procéder au paiement
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/login" className="block">
+                  <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white" size="lg">
+                    Se connecter pour commander
+                  </Button>
+                </Link>
+              )}
+              
               <Button 
                 variant="outline" 
                 className="w-full text-orange-600 border-orange-600 hover:bg-orange-50"
                 size="lg"
+                disabled={!user}
               >
                 Payer avec PayPal
               </Button>
             </div>
+
+            {!user && (
+              <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-800">
+                  💡 Connectez-vous pour accéder au processus de commande complet
+                </p>
+              </div>
+            )}
 
             <div className="mt-6 pt-6 border-t">
               <div className="flex items-center space-x-2 text-sm text-gray-600">

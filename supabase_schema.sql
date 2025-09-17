@@ -245,3 +245,22 @@ CREATE POLICY "Allow admin delete access to inventory" ON inventory FOR DELETE U
 
 
 
+
+-- Ajouter les colonnes manquantes à la table orders pour supporter le processus de commande complet
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_method TEXT DEFAULT 'domicile';
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS delivery_price NUMERIC(10, 2) DEFAULT 0;
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS payment_method TEXT DEFAULT 'card';
+
+-- Contraintes pour les nouveaux champs
+ALTER TABLE orders ADD CONSTRAINT IF NOT EXISTS chk_delivery_method 
+  CHECK (delivery_method IN ('domicile', 'point_relais', 'express'));
+ALTER TABLE orders ADD CONSTRAINT IF NOT EXISTS chk_payment_method 
+  CHECK (payment_method IN ('card', 'paypal'));
+ALTER TABLE orders ADD CONSTRAINT IF NOT EXISTS chk_delivery_price_non_negative 
+  CHECK (delivery_price >= 0);
+
+-- Commentaires pour documenter les nouveaux champs
+COMMENT ON COLUMN orders.delivery_method IS 'Mode de livraison: domicile, point_relais, express';
+COMMENT ON COLUMN orders.delivery_price IS 'Prix de la livraison en euros';
+COMMENT ON COLUMN orders.payment_method IS 'Méthode de paiement: card, paypal';
+

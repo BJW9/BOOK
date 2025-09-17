@@ -175,3 +175,149 @@ Une fois les étapes de configuration Supabase terminées, vous aurez une applic
 
 N'hésitez pas à me solliciter si vous avez des questions ou si vous souhaitez de l'aide pour les prochaines phases de développement. Bon codage !
 
+
+
+## 7. Nouvelles Fonctionnalités Ajoutées
+
+### Processus de Commande Complet
+
+Le projet inclut maintenant un processus de commande entièrement fonctionnel :
+
+#### Page de Checkout (`/checkout`)
+- **Sélection d'adresse de livraison** : Utilisation des adresses enregistrées ou saisie d'une nouvelle adresse
+- **Choix du mode de livraison** :
+  - **Livraison à domicile** : 4,99 € (2-3 jours ouvrés)
+  - **Point Relais Mondial Relay** : 3,99 € (2-3 jours ouvrés)
+  - **Livraison Express** : 9,99 € (24h)
+- **Méthodes de paiement simulées** : Carte bancaire et PayPal
+- **Récapitulatif détaillé** : Articles, prix, livraison, total
+- **Validation sécurisée** : Vérification de l'authentification utilisateur
+
+#### Page de Confirmation (`/order-confirmation/:orderId`)
+- **Confirmation visuelle** avec numéro de commande
+- **Détails complets** : Date, statut, mode de livraison, montant
+- **Suivi des étapes** : Progression de la commande
+- **Actions utilisateur** : Accès au profil et poursuite des achats
+
+### Gestion Interactive des Adresses
+
+La gestion des adresses utilisateur a été entièrement repensée :
+
+#### Fonctionnalités Améliorées
+- **Interface intuitive** : Dialogue modal pour ajouter/modifier des adresses
+- **Validation des champs** : Contrôles de saisie obligatoires
+- **Adresse par défaut** : Système de définition d'adresse principale
+- **Actions complètes** : Ajout, modification, suppression, définition par défaut
+- **Feedback utilisateur** : Messages de confirmation et d'erreur
+- **Design responsive** : Interface adaptée mobile et desktop
+
+#### Intégration avec le Checkout
+- **Sélection automatique** : Utilisation de l'adresse par défaut
+- **Fallback intelligent** : Saisie d'une nouvelle adresse si aucune n'est enregistrée
+- **Synchronisation temps réel** : Mise à jour immédiate des données
+
+### Améliorations du Panier
+
+#### Nouvelles Fonctionnalités
+- **Authentification requise** : Redirection vers la connexion pour les utilisateurs non connectés
+- **Calcul dynamique** : Prix de livraison inclus dans le total estimé
+- **Bouton intelligent** : Adaptation selon l'état de connexion
+- **Informations contextuelles** : Indication des options de livraison Mondial Relay
+
+### Structure de Base de Données Étendue
+
+Le schéma SQL a été enrichi pour supporter les nouvelles fonctionnalités :
+
+#### Nouvelles Colonnes dans `orders`
+```sql
+-- Mode de livraison (domicile, point_relais, express)
+delivery_method TEXT DEFAULT 'domicile'
+
+-- Prix de la livraison
+delivery_price NUMERIC(10, 2) DEFAULT 0
+
+-- Méthode de paiement (card, paypal)
+payment_method TEXT DEFAULT 'card'
+```
+
+#### Contraintes et Validations
+- **Contrôles d'intégrité** : Validation des modes de livraison et paiement
+- **Contraintes de prix** : Prix de livraison non négatif
+- **Documentation** : Commentaires SQL pour chaque champ
+
+## 8. Guide d'Utilisation
+
+### Flux Utilisateur Complet
+
+1. **Navigation** : Parcours du catalogue de produits
+2. **Ajout au panier** : Sélection et quantités
+3. **Authentification** : Connexion ou inscription
+4. **Gestion du profil** : Ajout d'adresses de livraison
+5. **Processus de commande** :
+   - Sélection de l'adresse de livraison
+   - Choix du mode de livraison (Mondial Relay)
+   - Sélection du mode de paiement
+   - Validation et paiement simulé
+6. **Confirmation** : Récapitulatif et suivi de commande
+
+### Fonctionnalités Administratives
+
+Le schéma de base de données supporte déjà :
+- **Gestion des rôles** : Distinction client/admin
+- **Suivi des commandes** : Statuts et historique
+- **Gestion des stocks** : Inventaire et disponibilité
+- **Catégorisation** : Organisation des produits
+
+## 9. Tests et Validation
+
+### Scénarios de Test Recommandés
+
+1. **Parcours utilisateur complet** :
+   - Inscription → Ajout d'adresse → Commande → Confirmation
+
+2. **Gestion des adresses** :
+   - Ajout, modification, suppression
+   - Définition d'adresse par défaut
+
+3. **Processus de commande** :
+   - Test des différents modes de livraison
+   - Validation des calculs de prix
+   - Simulation de paiement
+
+4. **Authentification** :
+   - Connexion, déconnexion
+   - Réinitialisation de mot de passe
+   - Persistance des sessions
+
+### Points de Contrôle
+
+- ✅ **Responsive Design** : Interface adaptée mobile/desktop
+- ✅ **Accessibilité** : Navigation au clavier, contrastes
+- ✅ **Performance** : Chargement rapide, optimisations
+- ✅ **Sécurité** : Validation côté client et serveur
+- ✅ **UX/UI** : Feedback utilisateur, états de chargement
+
+## 10. Évolutions Futures
+
+### Intégrations Possibles
+
+1. **Paiement réel** : Intégration Stripe ou PayPal
+2. **API Mondial Relay** : Sélection de points relais réels
+3. **Emails automatiques** : Confirmations et notifications
+4. **Suivi de livraison** : Intégration transporteurs
+5. **Espace administrateur** : Interface de gestion complète
+
+### Optimisations Techniques
+
+1. **Cache** : Mise en cache des données produits
+2. **SEO** : Métadonnées dynamiques et sitemap
+3. **Analytics** : Suivi des conversions et comportements
+4. **Tests automatisés** : Couverture complète des fonctionnalités
+5. **CI/CD** : Déploiement automatisé et tests continus
+
+---
+
+**Projet mis à jour le** : 17 septembre 2025  
+**Version** : 2.0 - Processus de commande complet  
+**Statut** : Prêt pour la production avec paiement simulé
+
